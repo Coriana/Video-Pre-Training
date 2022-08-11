@@ -293,7 +293,7 @@ def main(video_path):
                     kb, new_kb , buttons, new_buttons = [], [], [], []
 
                     # print(prediction)
-
+                    prediction = str.replace(prediction, chr(39), chr(34))
                     f.write(prediction + '\n') # write to file
                     output.write(frame[..., ::-1])
                     #cv2.imwrite('frame'+ str(framenum) + '.png', frame[..., ::-1])
