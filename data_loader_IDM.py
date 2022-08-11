@@ -137,13 +137,13 @@ class DataLoader:
         self.n_epochs = n_epochs
         self.batch_size = batch_size
         self.max_queue_size = max_queue_size
-        unique_ids = glob.glob(os.path.join(dataset_dir, "*.mp4"))
+        unique_ids = glob.glob(os.path.join(dataset_dir, "*.avi"))
         unique_ids = list(set([os.path.basename(x).split(".")[0] for x in unique_ids]))
         self.unique_ids = unique_ids
         # Create tuples of (video_path, json_path) for each unique_id
         demonstration_tuples = []
         for unique_id in unique_ids:
-            video_path = os.path.abspath(os.path.join(dataset_dir, unique_id + ".mp4"))
+            video_path = os.path.abspath(os.path.join(dataset_dir, unique_id + ".avi"))
             json_path = os.path.abspath(os.path.join(dataset_dir, unique_id + ".jsonl"))
             demonstration_tuples.append((video_path, json_path))
 
