@@ -98,6 +98,7 @@ def main(video_path):
     w,h = cap.get(cv2.CAP_PROP_FRAME_WIDTH), cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
     mid_x, mid_y = int(w//2), int(h//2)
     frame_size = (640, 360)
+    outframe_size = AGENT_RESOLUTION
 
     # Obtain frame size information using get() method
     # Initialize video writer object
@@ -107,7 +108,7 @@ def main(video_path):
     FutureFrames = []
     out_path = video_path[:-4] # remove .mp4
     output = cv2.VideoWriter(out_path +'-debug.avi', cv2.VideoWriter_fourcc('M','J','P','G'), fps, frame_size)
-    clean_output = cv2.VideoWriter(out_path +'_.avi', cv2.VideoWriter_fourcc('M','J','P','G'), fps, AGENT_RESOLUTION)
+    clean_output = cv2.VideoWriter(out_path +'_.avi', cv2.VideoWriter_fourcc('M','J','P','G'), fps, outframe_size)
     with open(out_path + '_.jsonl', 'a') as f: # make .jsonl file and open for writing
         while(cap.isOpened()):
         
@@ -150,7 +151,7 @@ def main(video_path):
                     framenum= framenum +1
                     
                     frame = frames[i]
-                    outframe = resize_image(frame[..., ::-1], AGENT_RESOLUTION)
+                    outframe = resize_image(frame[..., ::-1], outframe_size)
                     clean_output.write(outframe)
                     for y, (action_name, action_array) in enumerate(predicted_actions.items()):
                         current_prediction = action_array[0, i]
