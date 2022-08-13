@@ -14,7 +14,7 @@ import cv2
 from run_inverse_dynamics_model import json_action_to_env_action
 from agent import resize_image, AGENT_RESOLUTION
 
-QUEUE_TIMEOUT = 10
+QUEUE_TIMEOUT = 500
 
 CURSOR_FILE = os.path.join(os.path.dirname(__file__), "cursors", "mouse_cursor_white_16x16.png")
 

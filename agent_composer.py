@@ -9,7 +9,7 @@ from lib.actions import ActionTransformer
 from lib.policy import MinecraftAgentPolicy
 from lib.torch_util import default_device_type, set_default_torch_device
 from composer.models import ComposerModel
-
+from lib.tree_util import tree_map
 
 # Hardcoded settings
 AGENT_RESOLUTION = (128, 128)
@@ -128,7 +128,8 @@ class MineRLAgent(ComposerModel):
         self.policy = MinecraftAgentPolicy(**agent_kwargs).to(device)
         self.hidden_state = self.policy.initial_state(1)
         self._dummy_first = th.from_numpy(np.array((False,))).to(device)
-
+        self.episode_hidden_states = {}
+        
     def load_weights(self, path):
         """Load model weights from a path, and reset hidden state"""
         self.policy.load_state_dict(th.load(path, map_location=self.device), strict=False)
@@ -197,8 +198,8 @@ class MineRLAgent(ComposerModel):
         for image, action, episode_id in zip(batch_images, batch_actions, batch_episode_id):
             if image is None and action is None:
                 # A work-item was done. Remove hidden state
-                if episode_id in episode_hidden_states:
-                    removed_hidden_state = episode_hidden_states.pop(episode_id)
+                if episode_id in self.episode_hidden_states:
+                    removed_hidden_state = self.episode_hidden_states.pop(episode_id)
                     del removed_hidden_state
                 continue
 
@@ -208,22 +209,22 @@ class MineRLAgent(ComposerModel):
                 continue
 
             agent_obs = self._env_obs_to_agent({"pov": image})
-            if episode_id not in episode_hidden_states:
-                episode_hidden_states[episode_id] = policy.initial_state(1)
-            agent_state = episode_hidden_states[episode_id]
+            if episode_id not in self.episode_hidden_states:
+                self.episode_hidden_states[episode_id] = self.policy.initial_state(1)
+            agent_state = self.episode_hidden_states[episode_id]
 
-            pi_distribution, v_prediction, new_agent_state = policy.get_output_for_observation(
+            pi_distribution, v_prediction, new_agent_state = self.policy.get_output_for_observation(
                 agent_obs,
                 agent_state,
-                dummy_first
+                self._dummy_first
             )
 
-            log_prob  = policy.get_logprob_of_action(pi_distribution, agent_action)
+            log_prob  = self.policy.get_logprob_of_action(pi_distribution, agent_action)
 
             # Make sure we do not try to backprop through sequence
             # (fails with current accumulation)
             new_agent_state = tree_map(lambda x: x.detach(), new_agent_state)
-            episode_hidden_states[episode_id] = new_agent_state
+            self.episode_hidden_states[episode_id] = new_agent_state
 
             # Finally, update the agent to increase the probability of the
             # taken action.
@@ -231,12 +232,17 @@ class MineRLAgent(ComposerModel):
             #loss = -log_prob / BATCH_SIZE
             batch_loss.append(-log_prob)
 
-        return self.model(batch_loss)
+        return batch_loss
 
     def loss(self, outputs, batch):
         # pass batches and `forward` outputs to the loss
-        _, targets = batch
-        return F.cross_entropy(outputs, targets)
+        for loss_prob in enumerate(outputs):
+            loss = loss_prob[1]/len(batch)
+       #loss.backward()
+       # print(outputs)
+        #print(batch)
+        #_, targets = batch
+        return loss
         
     def get_action(self, minerl_obs):
         """

@@ -60,8 +60,6 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     policy = agent.policy
     trainable_parameters = policy.parameters()
 
-    episode_hidden_states = {}
-    dummy_first = th.from_numpy(np.array((False,))).to(DEVICE)
     
     # Parameters taken from the OpenAI VPT paper
     optimizer = th.optim.Adam(
