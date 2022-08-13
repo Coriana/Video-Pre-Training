@@ -189,8 +189,49 @@ class MineRLAgent(ComposerModel):
         
     def forward(self, batch): # batch is the output of the dataloader
         # specify how batches are passed through the model
-        inputs, _ = batch
-        return self.model(inputs)
+        batch_images = batch[0]
+        batch_actions = batch[1]
+        batch_episode_id = batch[2]
+        # for batch_i, (batch_images, batch_actions, batch_episode_id) in enumerate(batch):
+        batch_loss = []
+        for image, action, episode_id in zip(batch_images, batch_actions, batch_episode_id):
+            if image is None and action is None:
+                # A work-item was done. Remove hidden state
+                if episode_id in episode_hidden_states:
+                    removed_hidden_state = episode_hidden_states.pop(episode_id)
+                    del removed_hidden_state
+                continue
+
+            agent_action = self._env_action_to_agent(action, to_torch=True, check_if_null=True)
+            if agent_action is None:
+                # Action was null
+                continue
+
+            agent_obs = self._env_obs_to_agent({"pov": image})
+            if episode_id not in episode_hidden_states:
+                episode_hidden_states[episode_id] = policy.initial_state(1)
+            agent_state = episode_hidden_states[episode_id]
+
+            pi_distribution, v_prediction, new_agent_state = policy.get_output_for_observation(
+                agent_obs,
+                agent_state,
+                dummy_first
+            )
+
+            log_prob  = policy.get_logprob_of_action(pi_distribution, agent_action)
+
+            # Make sure we do not try to backprop through sequence
+            # (fails with current accumulation)
+            new_agent_state = tree_map(lambda x: x.detach(), new_agent_state)
+            episode_hidden_states[episode_id] = new_agent_state
+
+            # Finally, update the agent to increase the probability of the
+            # taken action.
+            # Remember to take mean over batch losses
+            #loss = -log_prob / BATCH_SIZE
+            batch_loss.append(-log_prob)
+
+        return self.model(batch_loss)
 
     def loss(self, outputs, batch):
         # pass batches and `forward` outputs to the loss

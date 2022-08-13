@@ -19,6 +19,7 @@ import minerl
 import torch as th
 import numpy as np
 
+from composer.core import DataSpec
 from composer import Trainer
 from agent_composer import PI_HEAD_KWARGS, MineRLAgent
 from data_loader import DataLoader
@@ -46,7 +47,10 @@ def load_model_parameters(path_to_model_file):
     pi_head_kwargs = agent_parameters["model"]["args"]["pi_head_opts"]
     pi_head_kwargs["temperature"] = float(pi_head_kwargs["temperature"])
     return policy_kwargs, pi_head_kwargs
-
+        
+def num_samples_fn(batch):
+    return BATCH_SIZE
+  
 def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     agent_policy_kwargs, agent_pi_head_kwargs = load_model_parameters(in_model)
 
@@ -56,6 +60,9 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
     policy = agent.policy
     trainable_parameters = policy.parameters()
 
+    episode_hidden_states = {}
+    dummy_first = th.from_numpy(np.array((False,))).to(DEVICE)
+    
     # Parameters taken from the OpenAI VPT paper
     optimizer = th.optim.Adam(
         trainable_parameters,
@@ -69,13 +76,17 @@ def behavioural_cloning_train(data_dir, in_model, in_weights, out_weights):
         batch_size=BATCH_SIZE,
         n_epochs=EPOCHS
     )
-
+    
+    data_spec = DataSpec(data_loader, get_num_samples_in_batch=num_samples_fn,)
+    
     trainer = Trainer(
         model=agent,
         optimizers=optimizer,
-        train_dataloader=data_loader,
+        train_dataloader=data_spec,
         max_duration='10ep'
     )
+    
+    
     trainer.fit()
 
     state_dict = policy.state_dict()
